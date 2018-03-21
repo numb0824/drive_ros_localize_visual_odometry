@@ -1,0 +1,6 @@
+# only look for features in this region (pixel)
+roi:
+    x_min: 200
+    x_max: 900
+    y_min: 40
+    y_max: 280
