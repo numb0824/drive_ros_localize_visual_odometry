@@ -17,10 +17,7 @@
 
 
 class SimpleVisualOdometry {
-    //lms::ReadDataChannel<lms::imaging::Image> image;
-    //lms::WriteDataChannel<lms::imaging::Image> debugImage,trajectoryImage;
-    //lms::WriteDataChannel<lms::math::Pose2DHistory> poseHistory;
-    //lms::imaging::Image oldImage;
+
     ros::Subscriber cam_info_sub;
     ros::Subscriber homog_sub;
     image_transport::Subscriber image_sub;
@@ -64,6 +61,13 @@ class SimpleVisualOdometry {
     bool calLoaded;
     bool homoLoaded;
     image_geometry::PinholeCameraModel camera_model;
+
+    float vx_max;
+    float vx_min;
+    float vy_max;
+    float vy_min;
+    float omega_max;
+    float omega_min;
 
 
 

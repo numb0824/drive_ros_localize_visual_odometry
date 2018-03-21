@@ -28,6 +28,13 @@ SimpleVisualOdometry::SimpleVisualOdometry(const ros::NodeHandle n, const ros::N
   roi = cv::Rect(x_min, y_min, x_max-x_min, y_max-y_min);
   ROS_INFO_STREAM("Loaded roi:\n" << roi);
 
+  pnh.getParam("limits/vx_max", vx_max);
+  pnh.getParam("limits/vx_min", vx_min);
+  pnh.getParam("limits/vy_max", vy_max);
+  pnh.getParam("limits/vy_min", vy_min);
+  pnh.getParam("limits/omega_max", omega_max);
+  pnh.getParam("limits/omega_min", omega_min);
+
   pnh.param<std::string>("static_frame", static_frame, "odometry");
   pnh.param<std::string>("moving_frame", moving_frame, "rear_axis_middle_ground");
 
@@ -413,23 +420,18 @@ void SimpleVisualOdometry::checkNewFeaturePoints(const cv::Rect roi){
 
 
 
-bool SimpleVisualOdometry::validateMeasurement(const float vx, const float vy, const float dPhi){
-    if(std::isnan(vx)|| std::isnan(vy) || std::isnan(dPhi)){
-        ROS_ERROR("vx or vy or dPhi is nan");
+bool SimpleVisualOdometry::validateMeasurement(const float vx, const float vy, const float omega){
+    if(std::isnan(vx)|| std::isnan(vy) || std::isnan(omega)){
+        ROS_ERROR("vx or vy or omega is nan");
         return false;
     }
-    float vxMax = 5;
-    float vyMax = 5;
-    float vxMin = -0.1;
-    float vyMin = -0.1;
-    float omegaMax = 0.5;
-    if(vx > vxMax || vx < vxMin){
+    if(vx > vx_max || vx < vx_min){
         return false;
     }
-    if(vy > vyMax || vy < vyMin){
+    if(vy > vy_max || vy < vy_min){
         return false;
     }
-    if(std::fabs(dPhi) > omegaMax){
+    if(omega > omega_max || omega < omega_min){
         return false;
     }
     return true;
