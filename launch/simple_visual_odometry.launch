@@ -7,7 +7,7 @@
     <arg name="image_topic" default="/camera/image_raw"/>
     <arg name="homo_topic" default="/camera/camera_homography"/>
     <arg name="odometry_topic" default="/odometry" />
-    <arg name="cam_info_topic" default=""/> <!-- if empty: it will be assumed that the image is already rectified and not warp is being done -->
+    <arg name="cam_info_topic" default=""/> <!-- if empty: it will be assumed that the image is already rectified and no undistortion is being done -->
 
     <!-- tf parent frame of published tf -->
     <arg name="static_frame" default="odometry"/>

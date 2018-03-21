@@ -18,22 +18,26 @@
 
 class SimpleVisualOdometry {
 
-    ros::Subscriber cam_info_sub;
-    ros::Subscriber homog_sub;
-    image_transport::Subscriber image_sub;
 
+    // ros node handle
+    ros::NodeHandle nh;
+    ros::NodeHandle pnh;
+    image_transport::ImageTransport it;
+
+    // publisher
     ros::Publisher odo_pub;
     tf2_ros::TransformBroadcaster br;
 
-
-    std::vector<cv::Point2f> oldImagePoints;
-
+    // subscriber
+    ros::Subscriber cam_info_sub;
+    ros::Subscriber homog_sub;
+    image_transport::Subscriber image_sub;
+    image_geometry::PinholeCameraModel camera_model;
+    bool calRequired;
+    bool homoRequired;
     cv::Mat cam2world;
+    ros::Time oldMsgTime;
 
-    cv::Rect roi;
-
-    std::string static_frame;
-    std::string moving_frame;
 
     // todo use other type (so that it is clear what this is)
     cv::Mat currentPosition;
@@ -42,26 +46,26 @@ class SimpleVisualOdometry {
     cv_bridge::CvImagePtr oldImage;
     cv_bridge::CvImagePtr newImage;
 
-    //tmp objects
+    // region of interest (only search in this area)
+    cv::Rect roi;
+
+    // feature points
     std::vector<cv::Point2f> newImagePoints;
+    std::vector<cv::Point2f> oldImagePoints;
+
+    // tracking status
     std::vector<uchar> status;
+
+    // kalman filter
     kalman_filters::ctrv_vxy::MassModelUKF ukf;
 
-    // ros node handle
-    ros::NodeHandle nh;
-    ros::NodeHandle pnh;
-    image_transport::ImageTransport it;
-
-
+    // parameter
     bool drawDebug;
     int fastThreshold;
     int minFeatureCount;
 
-    ros::Time oldMsgTime;
-
-    bool calRequired;
-    bool homoRequired;
-    image_geometry::PinholeCameraModel camera_model;
+    std::string static_frame;
+    std::string moving_frame;
 
     float vx_max;
     float vx_min;
@@ -84,8 +88,6 @@ public:
     void checkNewFeaturePoints(const cv::Rect rect);
     bool validateMeasurement(const float vx,const float vy,const float dPhi);
     void featureTracking(cv::Rect rect, const cv::Mat &new_im, const cv::Mat &old_im);
-
-
 
 };
 

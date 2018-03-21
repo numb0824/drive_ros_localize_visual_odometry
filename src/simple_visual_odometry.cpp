@@ -141,7 +141,7 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
       }
 
       // TODO
-      dt = 0.03;
+      dt = 0.1;
       ukf.predict(dt);
 
 
@@ -167,7 +167,7 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
       //track the old feature points
       featureTracking(roi, newImage->image, oldImage->image);
 
-
+      // TODO improve this section
       if((int)newImagePoints.size() < minFeatureCount){
           ROS_WARN_STREAM("Not enough points tracked! New image points: " << newImagePoints.size());
           if(!alreadySearched){
@@ -188,7 +188,7 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
       }
 
 
-
+      // use ROS publisher instead
       if(drawDebug){
 
           cv::Mat colorImage;
@@ -213,7 +213,6 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
 
           // show image
           cv::imshow("debug_image", colorImage);
-
           cv::waitKey(1);
 
 
@@ -222,7 +221,7 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
       if(newImagePoints.size() > 1){
 
           //transform points to 2D-Coordinates
-          std::vector<cv::Point2f> world_old,world_new;
+          std::vector<cv::Point2f> world_old, world_new;
           cv::perspectiveTransform(oldImagePoints, world_old, cam2world);
           cv::perspectiveTransform(newImagePoints, world_new, cam2world);
 
@@ -251,20 +250,17 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
           if(cv::solve(leftSide,rightSide,res,cv::DECOMP_SVD)){
               float dx = res.at<double>(2);
               float dy = res.at<double>(3);
-              float angle = std::atan2(res.at<double>(1),res.at<double>(0));
+              float angle = std::atan2(res.at<double>(1), res.at<double>(0));
 
-              if(validateMeasurement(dx/dt,dy/dt,angle/dt)){
+              if(validateMeasurement(dx/dt, dy/dt, angle/dt)){
                   //update the ukf
                   ROS_DEBUG_STREAM("updating ukf" << dx/dt << " " << dy/dt << " " << angle/dt);
 
-
-
-
-                  ukf.setMeasurementVec(dx/dt,dy/dt,angle/dt);
+                  ukf.setMeasurementVec(dx/dt, dy/dt, angle/dt);
                   ukf.update();
 
               }else{
-                  ROS_WARN_STREAM("not updating ukf, invalid values: " << dx/dt << " " << dy/dt << " " << angle/dt);
+                  ROS_WARN_STREAM("not updating ukf, invalid values: vx=" << dx/dt << " vy=" << dy/dt << " omega=" << angle/dt);
               }
           }else{
               ROS_ERROR("solving SVD failed!");
@@ -395,7 +391,6 @@ void SimpleVisualOdometry::checkNewFeaturePoints(const cv::Rect roi){
 
 
 
-
 bool SimpleVisualOdometry::validateMeasurement(const float vx, const float vy, const float omega){
     if(std::isnan(vx)|| std::isnan(vy) || std::isnan(omega)){
         ROS_ERROR("vx or vy or omega is nan");
@@ -412,6 +407,7 @@ bool SimpleVisualOdometry::validateMeasurement(const float vx, const float vy, c
     }
     return true;
 }
+
 
 
 //TODO We could try Kabasch_algoithm
