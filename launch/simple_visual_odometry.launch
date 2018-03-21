@@ -5,10 +5,9 @@
 
     <!-- topic names -->
     <arg name="image_topic" default="/camera/image_raw"/>
-    <arg name="cam_info_topic" default="/camera/camera_info"/>
     <arg name="homo_topic" default="/camera/camera_homography"/>
     <arg name="odometry_topic" default="/odometry" />
-
+    <arg name="cam_info_topic" default=""/> <!-- if empty: it will be assumed that the image is already rectified and not warp is being done -->
 
     <!-- tf parent frame of published tf -->
     <arg name="static_frame" default="odometry"/>
@@ -33,9 +32,9 @@
     <node name="simple_visual_odometry" pkg="drive_ros_localize_visual_odometry"
           type="simple_visual_odometry" respawn="false" output="screen">
         <remap from="~/img_in" to="$(arg image_topic)"/>
-        <remap from="~/cam_info" to="$(arg cam_info_topic)"/>
         <remap from="~/homog" to="$(arg homo_topic)"/>
         <remap from="~/odom_out" to="$(arg odometry_topic)" />
+        <param name="cam_info_topic" type="str" value="$(arg cam_info_topic)"/> <!-- handle as parameter because could be empty -->
         <param name="static_frame" type="str" value="$(arg static_frame)" />
         <param name="moving_frame" type="str" value="$(arg moving_frame)" />
         <param name="draw_debug" type="bool" value="$(arg draw_debug)" />

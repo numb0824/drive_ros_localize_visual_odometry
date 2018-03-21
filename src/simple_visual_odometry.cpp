@@ -6,9 +6,6 @@ SimpleVisualOdometry::SimpleVisualOdometry(const ros::NodeHandle n, const ros::N
 {
 
   // reset parameters
-  calLoaded = false;
-  homoLoaded = false;
-
   currentPosition.create(3,1,CV_64F);
   currentPosition.at<double>(0) = 0;
   currentPosition.at<double>(1) = 0;
@@ -47,13 +44,22 @@ SimpleVisualOdometry::SimpleVisualOdometry(const ros::NodeHandle n, const ros::N
     cv::namedWindow("debug_image");
   }
 
+  std::string cam_info_topic;
+  pnh.param<std::string>("cam_info_topic", cam_info_topic);
+  if(cam_info_topic.empty()){
+    calRequired = false;
+  }else{
+    calRequired = true;
+    cam_info_sub = pnh.subscribe(cam_info_topic, 1, &SimpleVisualOdometry::camInfoCb, this);
+  }
+
+  homoRequired = true;
 
   // publish
   odo_pub = pnh.advertise<nav_msgs::Odometry>("odom_out", 0);
 
   // subscribe to topics
   image_sub = it.subscribe("img_in", 1, &SimpleVisualOdometry::imageCb, this);
-  cam_info_sub = pnh.subscribe("cam_info", 1, &SimpleVisualOdometry::camInfoCb, this);
   homog_sub = pnh.subscribe("homog", 1, &SimpleVisualOdometry::homogCb, this);
 
 
@@ -62,9 +68,9 @@ SimpleVisualOdometry::SimpleVisualOdometry(const ros::NodeHandle n, const ros::N
 
 void SimpleVisualOdometry::camInfoCb(const sensor_msgs::CameraInfo& msg)
 {
-  if(!calLoaded){
+  if(calRequired){
     camera_model.fromCameraInfo(msg);
-    calLoaded = true;
+    calRequired = false;
     std::cout << camera_model.distortionCoeffs() << std::endl;
     ROS_INFO_STREAM("Got camera info message. Saving Parameters.");
   }
@@ -76,7 +82,7 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
 {
 
   // check if we got everything we need before starting
-  if(!calLoaded || !homoLoaded)
+  if(calRequired || homoRequired)
   {
     return;
   }
@@ -100,13 +106,25 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
   }
 
   // undistort image
-  cv::Mat newImage = cv_ptr->image;
-  //cv::undistort(cv_ptr->image, newImage, camera_model.intrinsicMatrix(),
-  //                                  camera_model.distortionCoeffs());
+  cv::Mat* newImage;
+  cv::Mat undistortedImage; // we may not need this
+
+  if(camera_model.distortionCoeffs().empty()){
+    // there arent any distortion coefficients saved
+    // assume that we dont have to undistort the image
+    newImage = &cv_ptr->image;
+  }else{
+    // we have to undistort the image
+    cv::undistort(cv_ptr->image, undistortedImage, camera_model.intrinsicMatrix(),
+                                                   camera_model.distortionCoeffs());
+
+    newImage = &undistortedImage;
+  }
+
   // check if old image is ok
   if(oldImage.empty())
   {
-    oldImage = newImage;
+    oldImage = *newImage;
     return;
   }
 
@@ -144,7 +162,7 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
           detectFeaturePointsInOldImage(roi, fastThreshold);
           if(oldImagePoints.size() == 0){
               // save image as old image
-              oldImage = newImage;
+              oldImage = *newImage;
               ROS_WARN("No features detected!");
               return;
           }
@@ -152,7 +170,7 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
 
       ROS_DEBUG_STREAM("Number of old points: " << oldImagePoints.size());
       //track the old feature points
-      featureTracking(roi, newImage, oldImage);
+      featureTracking(roi, *newImage, oldImage);
 
 
       //TODO featureTracking(oldImFull,newIm,oldImagePoints,newImagePoints, status); //track those features to the new image
@@ -168,7 +186,7 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
           if(oldImagePoints.size() == 0){
               ROS_WARN("No features detected!");
           }else{
-              featureTracking(roi, newImage, oldImage);
+              featureTracking(roi, *newImage, oldImage);
               //TODO featureTracking(oldImFull,newIm,oldImagePoints,newImagePoints, status); //track those features to the new image
               //checkNewFeaturePoints(rect);
               ROS_DEBUG_STREAM("tracking new features: " << newImagePoints.size());
@@ -185,7 +203,7 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
           cv::Mat colorImage;
 
           // convert to color
-          cv::cvtColor(newImage, colorImage, CV_GRAY2BGR);
+          cv::cvtColor(*newImage, colorImage, CV_GRAY2BGR);
 
           // draw roi
           cv::rectangle(colorImage, roi, cv::Scalar(0, 0, 255));
@@ -321,7 +339,7 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
       odo_pub.publish(odo);
 
       //set old values
-      oldImage = newImage;
+      oldImage = *newImage;
       oldImagePoints = newImagePoints;
       oldMsgTime = msg->header.stamp;
 //      if(drawDebug){
@@ -347,7 +365,7 @@ void SimpleVisualOdometry::homogCb(const drive_ros_msgs::HomographyConstPtr& msg
 {
 
   // assume homography does not change during runtime
-  if(!homoLoaded)
+  if(homoRequired)
   {
     if(msg->cam2world.layout.dim[0].size != 3 ||
        msg->cam2world.layout.dim[1].size != 3 )
@@ -364,7 +382,7 @@ void SimpleVisualOdometry::homogCb(const drive_ros_msgs::HomographyConstPtr& msg
       }
     }
 
-    homoLoaded = true;
+    homoRequired = false;
     ROS_INFO_STREAM("Homography msg received. Cam2World: \n" << cam2world);
   }
 

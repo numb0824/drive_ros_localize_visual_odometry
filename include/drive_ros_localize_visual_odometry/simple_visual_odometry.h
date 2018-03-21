@@ -58,8 +58,8 @@ class SimpleVisualOdometry {
 
     ros::Time oldMsgTime;
 
-    bool calLoaded;
-    bool homoLoaded;
+    bool calRequired;
+    bool homoRequired;
     image_geometry::PinholeCameraModel camera_model;
 
     float vx_max;
