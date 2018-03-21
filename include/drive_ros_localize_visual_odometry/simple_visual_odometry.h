@@ -39,7 +39,8 @@ class SimpleVisualOdometry {
     cv::Mat currentPosition;
     cv::Mat transRotNew,transRotOld;
 
-    cv::Mat oldImage;
+    cv_bridge::CvImagePtr oldImage;
+    cv_bridge::CvImagePtr newImage;
 
     //tmp objects
     std::vector<cv::Point2f> newImagePoints;
@@ -79,10 +80,13 @@ public:
     void imageCb(const sensor_msgs::ImageConstPtr& msg);
     void homogCb(const drive_ros_msgs::HomographyConstPtr& msg);
 
-    void detectFeaturePointsInOldImage(const cv::Rect rect, const int fastThreshold);
+    void detectFeaturePointsInOldImage(const cv::Rect rect, const int fastThreshold, const cv::Mat& old_im);
     void checkNewFeaturePoints(const cv::Rect rect);
     bool validateMeasurement(const float vx,const float vy,const float dPhi);
-    void featureTracking(cv::Rect rect, const cv::Mat &newImage, const cv::Mat &oldImage);
+    void featureTracking(cv::Rect rect, const cv::Mat &new_im, const cv::Mat &old_im);
+
+
+
 };
 
 #endif // SIMPLE_VISUAL_ODOMETRY_H

@@ -15,6 +15,9 @@ SimpleVisualOdometry::SimpleVisualOdometry(const ros::NodeHandle n, const ros::N
 
   ukf.init();
 
+  // properly initialize
+  oldImage =  cv_bridge::CvImagePtr(new cv_bridge::CvImage);
+
 
   //get parameters
   int x_min, x_max, y_min, y_max;
@@ -88,10 +91,9 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
   }
 
   // convert message to cv pointer
-  cv_bridge::CvImagePtr cv_ptr;
   try
   {
-    cv_ptr = cv_bridge::toCvCopy(msg);
+    newImage = cv_bridge::toCvCopy(msg);
   }
   catch(cv_bridge::Exception& e)
   {
@@ -99,39 +101,35 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
     return;
   }
 
-  if(cv_ptr->image.empty())
+  if(newImage->image.empty())
   {
     ROS_WARN("Empty image received, skipping!");
     return;
   }
 
-  // undistort image
-  cv::Mat* newImage;
-  cv::Mat undistortedImage; // we may not need this
 
-  if(camera_model.distortionCoeffs().empty()){
-    // there arent any distortion coefficients saved
-    // assume that we dont have to undistort the image
-    newImage = &cv_ptr->image;
-  }else{
+
+  // undistort image if needed
+  if(!camera_model.distortionCoeffs().empty()){
+    cv_bridge::CvImagePtr undistortedImage;
+
     // we have to undistort the image
-    cv::undistort(cv_ptr->image, undistortedImage, camera_model.intrinsicMatrix(),
-                                                   camera_model.distortionCoeffs());
-
-    newImage = &undistortedImage;
+    cv::undistort(newImage->image, undistortedImage->image, camera_model.intrinsicMatrix(),
+                                                            camera_model.distortionCoeffs());
+    newImage = undistortedImage;
   }
 
   // check if old image is ok
-  if(oldImage.empty())
+  if(oldImage->image.empty())
   {
-    oldImage = *newImage;
+    oldImage = newImage;
     return;
   }
 
 
-  //we try to find feature points in the old Image and try to redetect them in the new image
-  //if we haven't found enough feature points in the new image we try to find more in the old image, therefore we store the old image
-  //we crop the image to only find points on the road
+  // we try to find feature points in the old Image and try to redetect them in the new image
+  // if we haven't found enough feature points in the new image we try to find more in the old image, therefore we store the old image
+  // we crop the image to only find points on the road
 
 
   try{
@@ -143,7 +141,7 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
       }
 
       // TODO
-      dt = 0.1;
+      dt = 0.03;
       ukf.predict(dt);
 
 
@@ -154,31 +152,26 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
       bool alreadySearched = false;
       if(oldImagePoints.size() < minFeatureCount){
           alreadySearched = true;
-          /*
-          oldImagePoints.clear();
-          featureDetection(oldIm, oldImagePoints,fastThreshold); //detect points
-          //TODO transform found points coord-sys of the full image
-          */
-          detectFeaturePointsInOldImage(roi, fastThreshold);
+
+          detectFeaturePointsInOldImage(roi, fastThreshold, oldImage->image);
           if(oldImagePoints.size() == 0){
               // save image as old image
-              oldImage = *newImage;
+              oldImage = newImage;
               ROS_WARN("No features detected!");
               return;
           }
       }
 
       ROS_DEBUG_STREAM("Number of old points: " << oldImagePoints.size());
+
       //track the old feature points
-      featureTracking(roi, *newImage, oldImage);
+      featureTracking(roi, newImage->image, oldImage->image);
 
 
-      //TODO featureTracking(oldImFull,newIm,oldImagePoints,newImagePoints, status); //track those features to the new image
-      //checkNewFeaturePoints(rect);
       if((int)newImagePoints.size() < minFeatureCount){
           ROS_WARN_STREAM("Not enough points tracked! New image points: " << newImagePoints.size());
           if(!alreadySearched){
-              detectFeaturePointsInOldImage(roi,fastThreshold);
+              detectFeaturePointsInOldImage(roi,fastThreshold, oldImage->image);
           }else{
               ROS_WARN("already searched, found not enough points");
           }
@@ -186,9 +179,7 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
           if(oldImagePoints.size() == 0){
               ROS_WARN("No features detected!");
           }else{
-              featureTracking(roi, *newImage, oldImage);
-              //TODO featureTracking(oldImFull,newIm,oldImagePoints,newImagePoints, status); //track those features to the new image
-              //checkNewFeaturePoints(rect);
+              featureTracking(roi, newImage->image, oldImage->image);
               ROS_DEBUG_STREAM("tracking new features: " << newImagePoints.size());
               if(newImagePoints.size() <= 1){
                   ROS_DEBUG_STREAM("Not enough features could be tracked! New image point size: " << newImagePoints.size());
@@ -203,7 +194,7 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
           cv::Mat colorImage;
 
           // convert to color
-          cv::cvtColor(*newImage, colorImage, CV_GRAY2BGR);
+          cv::cvtColor(newImage->image, colorImage, CV_GRAY2BGR);
 
           // draw roi
           cv::rectangle(colorImage, roi, cv::Scalar(0, 0, 255));
@@ -271,26 +262,7 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
 
                   ukf.setMeasurementVec(dx/dt,dy/dt,angle/dt);
                   ukf.update();
-                  /*
-                  lms::imaging::BGRAImageGraphics traGraphics(*trajectoryImage);
-                  if(drawDebug){
-                      transRotNew.at<double>(0,0) = std::cos(angle);
-                      transRotNew.at<double>(0,1) = -std::sin(angle);
-                      transRotNew.at<double>(1,0) = std::sin(angle);
-                      transRotNew.at<double>(1,1) = std::cos(angle);
-                      transRotNew.at<double>(0,2) = dx;
-                      transRotNew.at<double>(1,2) = dy;
-                      transRotNew.at<double>(2,0) = 0;
-                      transRotNew.at<double>(2,1) = 0;
-                      transRotNew.at<double>(2,2) = 1;
-                      //translate the current position
-                      transRotOld = transRotOld*transRotNew;
-                      //currentPosition = transRotNew*currentPosition;
-                      cv::Mat newPos = transRotOld*currentPosition;
-                      traGraphics.setColor(lms::imaging::red);
-                      traGraphics.drawPixel(newPos.at<double>(0)*512/30+256,-newPos.at<double>(1)*512/30+256);
-                  }
-                  */
+
               }else{
                   ROS_WARN_STREAM("not updating ukf, invalid values: " << dx/dt << " " << dy/dt << " " << angle/dt);
               }
@@ -300,10 +272,6 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
       }else{
           //we lost track, no update for the ukf
       }
-      //add new pose
-
-      //poseHistory->addPose(ukf.lastState.x(),ukf.lastState.y(),ukf.lastState.phi(),lms::Time::now().toFloat<std::milli, double>());
-
 
       tf2::Quaternion q1;
       q1.setRPY(0, 0, ukf.lastState.phi());
@@ -339,20 +307,10 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
       odo_pub.publish(odo);
 
       //set old values
-      oldImage = *newImage;
+      oldImage = newImage;
       oldImagePoints = newImagePoints;
       oldMsgTime = msg->header.stamp;
-//      if(drawDebug){
-//          lms::imaging::BGRAImageGraphics traGraphics(*trajectoryImage);
-//          traGraphics.setColor(lms::imaging::blue);
-//          traGraphics.drawPixel(poseHistory->currentPose().x*512/30+256,-poseHistory->currentPose().y*512/30+256);
-//          //cv::namedWindow( "Camera", WINDOW_AUTOSIZE );
-//          cv::namedWindow( "Display window", cv::WINDOW_AUTOSIZE );// Create a window for display.
-//          cv::imshow( "Display window", trajectoryImage->convertToOpenCVMat() );                   // Show our image inside it.
 
-//          cv::waitKey(1);
-//      }
-        //oldImagePoints.clear();
 
       }catch(std::exception &e){
           ROS_ERROR_STREAM("exception thrown: " << e.what() << " reinitialising ukf");
@@ -391,11 +349,11 @@ void SimpleVisualOdometry::homogCb(const drive_ros_msgs::HomographyConstPtr& msg
 
 
 
-void SimpleVisualOdometry::detectFeaturePointsInOldImage(cv::Rect rect, const int fastThreshold){
+void SimpleVisualOdometry::detectFeaturePointsInOldImage(cv::Rect rect, const int fastThreshold, const cv::Mat& old_im){
     newImagePoints.clear();
     oldImagePoints.clear();
     status.clear();
-    vo_features::featureDetection(oldImage(rect), oldImagePoints, fastThreshold); //detect points
+    vo_features::featureDetection(old_im(rect), oldImagePoints, fastThreshold); //detect points
     for(cv::Point2f &v:oldImagePoints){
         v.x += rect.x;
         v.y += rect.y;
@@ -403,13 +361,13 @@ void SimpleVisualOdometry::detectFeaturePointsInOldImage(cv::Rect rect, const in
     //TODO transform found points coord-sys of the full image
 }
 
-void SimpleVisualOdometry::featureTracking(cv::Rect roi, const cv::Mat& newImage, const cv::Mat& oldImage){
+void SimpleVisualOdometry::featureTracking(cv::Rect roi, const cv::Mat& new_im, const cv::Mat& old_im){
     newImagePoints.clear();
     for(cv::Point2f &v:oldImagePoints){
         v.x -= roi.x;
         v.y -= roi.y;
     }
-    vo_features::featureTracking(oldImage(roi),newImage(roi),oldImagePoints,newImagePoints, status); //track those features to the new image
+    vo_features::featureTracking(old_im(roi),new_im(roi),oldImagePoints,newImagePoints, status); //track those features to the new image
     for(cv::Point2f &v:newImagePoints){
         v.x += roi.x;
         v.y += roi.y;
