@@ -1,6 +1,9 @@
 #include "drive_ros_localize_visual_odometry/simple_visual_odometry.h"
 #include "drive_ros_localize_visual_odometry/vo_features.h"
 
+
+
+
 SimpleVisualOdometry::SimpleVisualOdometry(const ros::NodeHandle n, const ros::NodeHandle p):
   nh(n),  pnh(p), it(p)
 {
@@ -12,8 +15,6 @@ SimpleVisualOdometry::SimpleVisualOdometry(const ros::NodeHandle n, const ros::N
   currentPosition.at<double>(2) = 1;
   transRotNew.create(3,3,CV_64F);
   transRotOld = cv::Mat::eye(3,3,CV_64F);
-
-  ukf.init();
 
   // properly initialize
   oldImage =  cv_bridge::CvImagePtr(new cv_bridge::CvImage);
@@ -28,12 +29,12 @@ SimpleVisualOdometry::SimpleVisualOdometry(const ros::NodeHandle n, const ros::N
   roi = cv::Rect(x_min, y_min, x_max-x_min, y_max-y_min);
   ROS_INFO_STREAM("Loaded roi:\n" << roi);
 
-  pnh.getParam("limits/vx_max", vx_max);
-  pnh.getParam("limits/vx_min", vx_min);
-  pnh.getParam("limits/vy_max", vy_max);
-  pnh.getParam("limits/vy_min", vy_min);
-  pnh.getParam("limits/omega_max", omega_max);
-  pnh.getParam("limits/omega_min", omega_min);
+  pnh.getParam("limits/dx_max", dx_max);
+  pnh.getParam("limits/dx_min", dx_min);
+  pnh.getParam("limits/dy_max", dy_max);
+  pnh.getParam("limits/dy_min", dy_min);
+  pnh.getParam("limits/theta_max", theta_max);
+  pnh.getParam("limits/theta_min", theta_min);
 
   pnh.param<std::string>("static_frame", static_frame, "odometry");
   pnh.param<std::string>("moving_frame", moving_frame, "rear_axis_middle_ground");
@@ -57,6 +58,9 @@ SimpleVisualOdometry::SimpleVisualOdometry(const ros::NodeHandle n, const ros::N
   }
 
   homoRequired = true;
+
+
+  theta_total = 0;
 
   // publish
   odo_pub = pnh.advertise<nav_msgs::Odometry>("odom_out", 0);
@@ -107,8 +111,6 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
     return;
   }
 
-
-
   // undistort image if needed
   if(!camera_model.distortionCoeffs().empty()){
     cv_bridge::CvImagePtr undistortedImage;
@@ -133,17 +135,6 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
 
 
   try{
-      //use the predict of the ukf to calculate new xy position if even if we haven't found feature points
-      float dt = (msg->header.stamp - oldMsgTime).toSec();
-      if(dt > 1 || dt < 0)
-      {
-        dt = 0.01;
-      }
-
-      // TODO
-      dt = 0.1;
-      ukf.predict(dt);
-
 
       //clear tmp objects
       newImagePoints.clear();
@@ -250,56 +241,58 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
           if(cv::solve(leftSide,rightSide,res,cv::DECOMP_SVD)){
               float dx = res.at<double>(2);
               float dy = res.at<double>(3);
-              float angle = std::atan2(res.at<double>(1), res.at<double>(0));
+              float theta = std::atan2(res.at<double>(1), res.at<double>(0));
 
-              if(validateMeasurement(dx/dt, dy/dt, angle/dt)){
-                  //update the ukf
-                  ROS_DEBUG_STREAM("updating ukf" << dx/dt << " " << dy/dt << " " << angle/dt);
+              // check if valid
+              if(validateMeasurement(dx, dy, theta)){
 
-                  ukf.setMeasurementVec(dx/dt, dy/dt, angle/dt);
-                  ukf.update();
+                  // update position
+                  ROS_DEBUG_STREAM("update position: " << dx << " " << dy << " " << theta);
+
+                  theta_total += theta;
+
+                  float costh = cos(theta_total);
+                  float sinth = sin(theta_total);
+
+                  odo.pose.pose.position.x += costh*dx + sinth*dy;
+                  odo.pose.pose.position.y += sinth*dx + costh*dy;
+
+                  tf2::Quaternion q1;
+                  q1.setRPY(0, 0, theta_total);
+
+                  odo.pose.pose.orientation.w = q1.w();
+                  odo.pose.pose.orientation.x = q1.x();
+                  odo.pose.pose.orientation.y = q1.y();
+                  odo.pose.pose.orientation.z = q1.z();
 
               }else{
-                  ROS_WARN_STREAM("not updating ukf, invalid values: vx=" << dx/dt << " vy=" << dy/dt << " omega=" << angle/dt);
+                  ROS_WARN_STREAM("not updating, exceded limits: dx=" << dx << " dy=" << dy << " theta=" << theta);
               }
           }else{
               ROS_ERROR("solving SVD failed!");
           }
       }else{
-          //we lost track, no update for the ukf
+          //we lost track, no update
       }
 
-      tf2::Quaternion q1;
-      q1.setRPY(0, 0, ukf.lastState.phi());
 
-      nav_msgs::Odometry odo;
-      odo.header.frame_id = "odom";
-      odo.child_frame_id = "rear_axis_middle_ground";
+      odo.header.frame_id = static_frame;
+      odo.child_frame_id = moving_frame;
       odo.header.stamp = ros::Time::now();
-      odo.pose.pose.position.x = ukf.lastState.x();
-      odo.pose.pose.position.y = ukf.lastState.y();
-      odo.pose.pose.orientation.w = q1.w();
-      odo.pose.pose.orientation.x = q1.x();
-      odo.pose.pose.orientation.y = q1.y();
-      odo.pose.pose.orientation.z = q1.z();
-
-
 
 
       geometry_msgs::TransformStamped tf;
-      tf.header.frame_id = "odom";
-      tf.child_frame_id = "rear_axis_middle_ground";
+      tf.header.frame_id = static_frame;
+      tf.child_frame_id = moving_frame;
       tf.header.stamp = ros::Time::now();
-      tf.transform.translation.x = ukf.lastState.x();
-      tf.transform.translation.y = ukf.lastState.y();
-      tf.transform.rotation.w = q1.w();
-      tf.transform.rotation.x = q1.x();
-      tf.transform.rotation.y = q1.y();
-      tf.transform.rotation.z = q1.z();
+      tf.transform.translation.x = odo.pose.pose.position.x;
+      tf.transform.translation.y = odo.pose.pose.position.y;
+      tf.transform.rotation.w = odo.pose.pose.orientation.w;
+      tf.transform.rotation.x = odo.pose.pose.orientation.x;
+      tf.transform.rotation.y = odo.pose.pose.orientation.y;
+      tf.transform.rotation.z = odo.pose.pose.orientation.z;
 
       br.sendTransform(tf);
-
-
       odo_pub.publish(odo);
 
       //set old values
@@ -309,8 +302,9 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
 
 
       }catch(std::exception &e){
-          ROS_ERROR_STREAM("exception thrown: " << e.what() << " reinitialising ukf");
-          ukf.init(ukf.lastState.x(),ukf.lastState.y(),ukf.lastState.phi());
+          ROS_ERROR_STREAM("exception thrown: " << e.what() << " reinitialising");
+
+          // TODO reset
       }
 }
 
@@ -391,18 +385,18 @@ void SimpleVisualOdometry::checkNewFeaturePoints(const cv::Rect roi){
 
 
 
-bool SimpleVisualOdometry::validateMeasurement(const float vx, const float vy, const float omega){
-    if(std::isnan(vx)|| std::isnan(vy) || std::isnan(omega)){
-        ROS_ERROR("vx or vy or omega is nan");
+bool SimpleVisualOdometry::validateMeasurement(const float dx, const float dy, const float theta){
+    if(std::isnan(dx)|| std::isnan(dy) || std::isnan(theta)){
+        ROS_ERROR("dx or dy or theta is nan");
         return false;
     }
-    if(vx > vx_max || vx < vx_min){
+    if(dx > dx_max || dx < dx_min){
         return false;
     }
-    if(vy > vy_max || vy < vy_min){
+    if(dy > dy_max || dy < dy_min){
         return false;
     }
-    if(omega > omega_max || omega < omega_min){
+    if(theta > theta_max || theta < theta_min){
         return false;
     }
     return true;

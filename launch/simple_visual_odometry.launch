@@ -10,7 +10,7 @@
     <arg name="cam_info_topic" default=""/> <!-- if empty: it will be assumed that the image is already rectified and no undistortion is being done -->
 
     <!-- tf parent frame of published tf -->
-    <arg name="static_frame" default="odometry"/>
+    <arg name="static_frame" default="odom"/>
 
     <!-- tf child frame of published tf -->
     <arg name="moving_frame" default="rear_axis_middle_ground"/>

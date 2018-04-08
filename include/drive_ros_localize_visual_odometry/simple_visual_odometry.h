@@ -3,7 +3,6 @@
 
 #include <ros/ros.h>
 #include <opencv/cv.h>
-#include "ctrv_vxy.h"
 
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
@@ -38,6 +37,10 @@ class SimpleVisualOdometry {
     cv::Mat cam2world;
     ros::Time oldMsgTime;
 
+    // output
+    nav_msgs::Odometry odo;
+    float theta_total;
+
 
     // todo use other type (so that it is clear what this is)
     cv::Mat currentPosition;
@@ -56,9 +59,6 @@ class SimpleVisualOdometry {
     // tracking status
     std::vector<uchar> status;
 
-    // kalman filter
-    kalman_filters::ctrv_vxy::MassModelUKF ukf;
-
     // parameter
     bool drawDebug;
     int fastThreshold;
@@ -67,12 +67,12 @@ class SimpleVisualOdometry {
     std::string static_frame;
     std::string moving_frame;
 
-    float vx_max;
-    float vx_min;
-    float vy_max;
-    float vy_min;
-    float omega_max;
-    float omega_min;
+    float dx_max;
+    float dx_min;
+    float dy_max;
+    float dy_min;
+    float theta_max;
+    float theta_min;
 
 
 

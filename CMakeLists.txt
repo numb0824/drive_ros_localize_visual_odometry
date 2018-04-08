@@ -12,7 +12,6 @@ find_package(catkin REQUIRED COMPONENTS
   image_geometry
   nav_msgs
   roscpp
-  kalman
   sensor_msgs
   tf2_ros
   cv_bridge

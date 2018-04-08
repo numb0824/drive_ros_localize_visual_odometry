@@ -7,9 +7,9 @@ roi:
 
 # discard data when theese limits are not met
 limits:
-    vx_max: 5
-    vx_min: -0.1
-    vy_max: 5
-    vy_min: -0.1
-    omega_max: 0.5
-    omega_min: -0.5
+    dx_max: 0.1
+    dx_min: -0.1
+    dy_max: 0.1
+    dy_min: -0.1
+    theta_max: 0.1
+    theta_min: -0.1
