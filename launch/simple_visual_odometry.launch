@@ -15,7 +15,7 @@
     <!-- tf child frame of published tf -->
     <arg name="moving_frame" default="rear_axis_middle_ground"/>
 
-    <!-- vehicle configuration file it should be named: <vehicle_model>_<vehicle>.yaml -->
+    <!-- vehicle configuration file it should be named: <vehicle>.yaml -->
     <arg name="vehicle_config" default="$(find drive_ros_localize_visual_odometry)/config/$(arg vehicle).yaml" />
 
 

@@ -1,15 +1,21 @@
 # only look for features in this region (pixel)
 roi:
-    x_min: 200
-    x_max: 900
-    y_min: 40
+    x_min: 100
+    x_max: 1000
+    y_min: 30
     y_max: 280
 
 # discard data when theese limits are not met
 limits:
-    dx_max: 0.1
+    dx_max: 0.15
     dx_min: -0.1
-    dy_max: 0.1
-    dy_min: -0.1
+    dy_max: 0.05
+    dy_min: -0.05
     theta_max: 0.1
     theta_min: -0.1
+
+# average filter lengths
+average:
+    x: 1
+    y: 1
+    theta: 1

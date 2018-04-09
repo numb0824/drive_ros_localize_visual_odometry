@@ -13,9 +13,15 @@
 #include <nav_msgs/Odometry.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_ros/transform_broadcaster.h>
+#include "drive_ros_localize_visual_odometry/moving_average.h"
 
 
 class SimpleVisualOdometry {
+
+    enum{
+      SUCCESS = 0,
+      FAIL = 1
+    };
 
 
     // ros node handle
@@ -74,7 +80,7 @@ class SimpleVisualOdometry {
     float theta_max;
     float theta_min;
 
-
+    MovingAverage avg_dx, avg_dy, avg_theta;
 
 public:
 
@@ -85,9 +91,9 @@ public:
     void homogCb(const drive_ros_msgs::HomographyConstPtr& msg);
 
     void detectFeaturePointsInOldImage(const cv::Rect rect, const int fastThreshold, const cv::Mat& old_im);
-    void checkNewFeaturePoints(const cv::Rect rect);
+    bool checkNewFeaturePoints(const cv::Rect rect);
     bool validateMeasurement(const float vx,const float vy,const float dPhi);
-    void featureTracking(cv::Rect rect, const cv::Mat &new_im, const cv::Mat &old_im);
+    bool featureTracking(cv::Rect rect, const cv::Mat &new_im, const cv::Mat &old_im);
 
 };
 
