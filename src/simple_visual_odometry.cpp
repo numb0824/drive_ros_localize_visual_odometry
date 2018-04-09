@@ -50,12 +50,6 @@ SimpleVisualOdometry::SimpleVisualOdometry(const ros::NodeHandle n, const ros::N
   pnh.param<int>("minFeatureCount", minFeatureCount, 10);
   pnh.param<int>("fastThreshold", fastThreshold, 50);
 
-  pnh.param<bool>("draw_debug", drawDebug, false);
-  if(drawDebug)
-  {
-    cv::namedWindow("debug_image");
-  }
-
   std::string cam_info_topic;
   pnh.param<std::string>("cam_info_topic", cam_info_topic);
   if(cam_info_topic.empty()){
@@ -71,6 +65,7 @@ SimpleVisualOdometry::SimpleVisualOdometry(const ros::NodeHandle n, const ros::N
 
   // publish
   odo_pub = pnh.advertise<nav_msgs::Odometry>("odom_out", 0);
+  ima_pub = it.advertise("img_out", 0);
 
   // subscribe to topics
   image_sub = it.subscribe("img_in", 1, &SimpleVisualOdometry::imageCb, this);
@@ -194,36 +189,6 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
   }
 
 
-  // use ROS publisher instead
-  if(drawDebug){
-
-      cv::Mat colorImage;
-
-      // convert to color
-      cv::cvtColor(newImage->image, colorImage, CV_GRAY2BGR);
-
-      // draw roi
-      cv::rectangle(colorImage, roi, cv::Scalar(0, 0, 255));
-
-      // draw old image points
-      for(auto pt: oldImagePoints)
-      {
-        circle(colorImage, pt, 5, Scalar( 0, 255, 0 ), 2, 8 );
-      }
-
-      // draw new image points
-      for(auto pt: newImagePoints)
-      {
-        circle(colorImage, pt, 5, Scalar( 255, 0, 0 ), 2, 8 );
-      }
-
-      // show image
-      cv::imshow("debug_image", colorImage);
-      cv::waitKey(1);
-
-
-  }
-
   if(newImagePoints.size() > 1){
 
       //transform points to 2D-Coordinates
@@ -291,11 +256,13 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
   }
 
 
+  // publish odometry
   odo.header.frame_id = static_frame;
   odo.child_frame_id = moving_frame;
   odo.header.stamp = ros::Time::now();
+  odo_pub.publish(odo);
 
-
+  // publish tf
   geometry_msgs::TransformStamped tf;
   tf.header.frame_id = static_frame;
   tf.child_frame_id = moving_frame;
@@ -306,11 +273,35 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
   tf.transform.rotation.x = odo.pose.pose.orientation.x;
   tf.transform.rotation.y = odo.pose.pose.orientation.y;
   tf.transform.rotation.z = odo.pose.pose.orientation.z;
-
   br.sendTransform(tf);
-  odo_pub.publish(odo);
 
-  //set old values
+
+  // publish only if anyone subscribes
+  if(0 != ima_pub.getNumSubscribers()){
+
+      // convert to color
+      cv_bridge::CvImagePtr colorImage = cv_bridge::cvtColor(newImage, sensor_msgs::image_encodings::BGR8);
+
+      // draw roi
+      cv::rectangle(colorImage->image, roi, cv::Scalar(0, 0, 255));
+
+      // draw old image points
+      for(auto pt: oldImagePoints)
+      {
+        circle(colorImage->image, pt, 5, cv::Scalar( 0, 255, 0 ), 2, 8 );
+      }
+
+      // draw new image points
+      for(auto pt: newImagePoints)
+      {
+        circle(colorImage->image, pt, 5, cv::Scalar( 255, 0, 0 ), 2, 8 );
+      }
+
+      // publish
+      ima_pub.publish(colorImage->toImageMsg());
+  }
+
+  // save for next image
   oldImage = newImage;
   oldImagePoints = newImagePoints;
   oldMsgTime = msg->header.stamp;

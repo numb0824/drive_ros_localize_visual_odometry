@@ -6,8 +6,10 @@
     <!-- topic names -->
     <arg name="image_topic" default="/camera/image_raw"/>
     <arg name="homo_topic" default="/camera/camera_homography"/>
-    <arg name="odometry_topic" default="/odometry" />
+    <arg name="odometry_topic" default="/visual_odom/odom" />
+    <arg name="debug_image_topic" default="/visual_odom/debug" />
     <arg name="cam_info_topic" default=""/> <!-- if empty: it will be assumed that the image is already rectified and no undistortion is being done -->
+
 
     <!-- tf parent frame of published tf -->
     <arg name="static_frame" default="odom"/>
@@ -24,20 +26,16 @@
     <arg name="fastThreshold" default="50" />
 
 
-    <!-- draws a debug window with some infos -->
-    <arg name="draw_debug" default="true" />
-
-
 
     <node name="simple_visual_odometry" pkg="drive_ros_localize_visual_odometry"
           type="simple_visual_odometry" respawn="false" output="screen">
         <remap from="~/img_in" to="$(arg image_topic)"/>
         <remap from="~/homog" to="$(arg homo_topic)"/>
         <remap from="~/odom_out" to="$(arg odometry_topic)" />
+        <remap from="~/img_out" to="$(arg debug_image_topic)" />
         <param name="cam_info_topic" type="str" value="$(arg cam_info_topic)"/> <!-- handle as parameter because could be empty -->
         <param name="static_frame" type="str" value="$(arg static_frame)" />
         <param name="moving_frame" type="str" value="$(arg moving_frame)" />
-        <param name="draw_debug" type="bool" value="$(arg draw_debug)" />
         <param name="fastThreshold" type="int" value="$(arg fastThreshold)" />
         <param name="minFeatureCount" type="int" value="$(arg minFeatureCount)" />
         <rosparam command="load" file="$(arg vehicle_config)"/>

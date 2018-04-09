@@ -31,6 +31,7 @@ class SimpleVisualOdometry {
 
     // publisher
     ros::Publisher odo_pub;
+    image_transport::Publisher ima_pub;
     tf2_ros::TransformBroadcaster br;
 
     // subscriber
@@ -66,7 +67,6 @@ class SimpleVisualOdometry {
     std::vector<uchar> status;
 
     // parameter
-    bool drawDebug;
     int fastThreshold;
     int minFeatureCount;
 
