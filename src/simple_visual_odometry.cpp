@@ -47,8 +47,8 @@ SimpleVisualOdometry::SimpleVisualOdometry(const ros::NodeHandle n, const ros::N
   pnh.param<std::string>("static_frame", static_frame, "odometry");
   pnh.param<std::string>("moving_frame", moving_frame, "rear_axis_middle_ground");
 
-  pnh.param<int>("minFeatureCount", minFeatureCount, 10);
-  pnh.param<int>("fastThreshold", fastThreshold, 50);
+  pnh.getParam("minFeatureCount", minFeatureCount);
+  pnh.getParam("fastThreshold", fastThreshold);
 
   std::string cam_info_topic;
   pnh.param<std::string>("cam_info_topic", cam_info_topic);

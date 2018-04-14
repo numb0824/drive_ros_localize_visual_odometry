@@ -1,9 +1,9 @@
 # only look for features in this region (pixel)
 roi:
-    x_min: 100
-    x_max: 1000
-    y_min: 30
-    y_max: 280
+    x_min: 10
+    x_max: 660
+    y_min: 250
+    y_max: 370
 
 # discard data when theese limits are not met
 limits:
@@ -22,9 +22,7 @@ average:
 
 # FAST (Features from Accelerated Segment Test) Threshold
 # more infos: https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_feature2d/py_fast/py_fast.html
-fastThreshold: 50
+fastThreshold: 5
 
 # minimal required feature count
-minFeatureCount: 8
-
-
+minFeatureCount: 5
