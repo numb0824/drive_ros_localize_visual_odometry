@@ -182,9 +182,6 @@ void SimpleVisualOdometry::imageCb(const sensor_msgs::ImageConstPtr& msg)
           }
 
           ROS_DEBUG_STREAM("tracking new features: " << newImagePoints.size());
-          if(newImagePoints.size() <= 1){
-              ROS_DEBUG_STREAM("Not enough features could be tracked! New image point size: " << newImagePoints.size());
-          }
       }
   }
 
