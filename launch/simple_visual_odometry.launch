@@ -4,8 +4,9 @@
     <arg name="vehicle" default="cc2017_car"/>
 
     <!-- topic names -->
-    <arg name="image_topic" default="/camera/image_raw"/>
-    <arg name="homo_topic" default="/camera/camera_homography"/>
+    <arg name="camera" default="camera"/>
+    <arg name="image_topic" default="/$(arg camera)/image_raw"/>
+    <arg name="homo_topic" default="/$(arg camera)/camera_homography"/>
     <arg name="odometry_topic" default="/visual_odom/odom" />
     <arg name="debug_image_topic" default="/visual_odom/debug" />
     <arg name="cam_info_topic" default=""/> <!-- if empty: it will be assumed that the image is already rectified and no undistortion is being done -->
