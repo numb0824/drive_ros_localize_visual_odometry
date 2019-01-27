@@ -188,6 +188,16 @@ add_dependencies(simple_visual_odometry ${drive_ros_msgs_generate_messages_cpp} 
    PATTERN ".svn" EXCLUDE
  )
 
+install(DIRECTORY launch/
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+    FILES_MATCHING PATTERN "*.launch"
+    )
+
+install(DIRECTORY config/
+    DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/config
+    FILES_MATCHING PATTERN "*.yaml"
+    )
+
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 # install(FILES
 #   # myfile1
